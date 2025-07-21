@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import CsvOptimizer from "./CsvOptimizer";
 import axios from "axios";
 import {
   ThemeProvider,
@@ -34,6 +35,52 @@ import ShareIcon from "@mui/icons-material/Share";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 
+// --- SVG Corner Blobs ---
+function CornerBlobs() {
+  return (
+    <>
+      {/* Top-left blob */}
+      <svg
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: 320,
+          height: 320,
+          zIndex: 0,
+          opacity: 0.14,
+          pointerEvents: "none"
+        }}
+        viewBox="0 0 600 600"
+      >
+        <path
+          d="M300,520Q170,480,120,370Q70,260,140,150Q210,40,350,90Q490,140,480,270Q470,400,300,520Z"
+          fill="#90caf9"
+        />
+      </svg>
+      {/* Bottom-right blob */}
+      <svg
+        style={{
+          position: "fixed",
+          bottom: 0,
+          right: 0,
+          width: 320,
+          height: 320,
+          zIndex: 0,
+          opacity: 0.11,
+          pointerEvents: "none"
+        }}
+        viewBox="0 0 600 600"
+      >
+        <path
+          d="M300,520Q170,480,120,370Q70,260,140,150Q210,40,350,90Q490,140,480,270Q470,400,300,520Z"
+          fill="#f48fb1"
+        />
+      </svg>
+    </>
+  );
+}
+
 const darkTheme = createTheme({
   palette: {
     mode: "dark",
@@ -47,21 +94,10 @@ const darkTheme = createTheme({
   components: {
     MuiSlider: {
       styleOverrides: {
-        root: {
-          height: 8,
-        },
-        thumb: {
-          width: 24,
-          height: 24,
-        },
-        track: {
-          height: 8,
-          borderRadius: 4,
-        },
-        rail: {
-          height: 8,
-          borderRadius: 4,
-        },
+        root: { height: 8 },
+        thumb: { width: 24, height: 24 },
+        track: { height: 8, borderRadius: 4 },
+        rail: { height: 8, borderRadius: 4 },
       },
     },
     MuiInput: {
@@ -125,12 +161,15 @@ function App() {
     setSelectedProblem(problem);
     setResult(null);
     setPlotUrl(null);
-    axios.get(`http://127.0.0.1:5000/api/problem_params/${problem.id}`).then((res) => {
-      setParamFields(res.data);
-      const defaults = {};
-      res.data.forEach((field) => (defaults[field.name] = field.default));
-      setParams(defaults);
-    });
+    // Only fetch params for non-csv_optimizer!
+    if (problem.id !== "csv_optimizer") {
+      axios.get(`http://127.0.0.1:5000/api/problem_params/${problem.id}`).then((res) => {
+        setParamFields(res.data);
+        const defaults = {};
+        res.data.forEach((field) => (defaults[field.name] = field.default));
+        setParams(defaults);
+      });
+    }
   };
 
   const handleParamChange = (name, value) => {
@@ -223,12 +262,14 @@ function App() {
             const found = res.data.find((x) => x.id === data.p);
             if (found) {
               setSelectedProblem(found);
-              axios
-                .get(`http://127.0.0.1:5000/api/problem_params/${found.id}`)
-                .then((res2) => {
-                  setParamFields(res2.data);
-                  setParams(data.params);
-                });
+              if (found.id !== "csv_optimizer") {
+                axios
+                  .get(`http://127.0.0.1:5000/api/problem_params/${found.id}`)
+                  .then((res2) => {
+                    setParamFields(res2.data);
+                    setParams(data.params);
+                  });
+              }
             }
           });
         }
@@ -239,6 +280,8 @@ function App() {
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
+      {/* SVG corner blobs */}
+      <CornerBlobs />
       <AppBar position="static" color="default" elevation={2} sx={{ mb: 3 }}>
         <Toolbar>
           <Typography variant="h5" sx={{ flexGrow: 1 }}>
@@ -279,6 +322,7 @@ function App() {
           alignItems: "center",
           justifyContent: selectedProblem ? "flex-start" : "center",
           minHeight: selectedProblem ? "unset" : "70vh",
+          zIndex: 1, // ensure content stays above blobs
         }}
       >
         {/* Problem Selection: Centered and spaced */}
@@ -362,7 +406,23 @@ function App() {
               </Box>
             </Box>
           </Fade>
+        ) : selectedProblem.id === "csv_optimizer" ? (
+          // SPECIAL CASE: Show CsvOptimizer component if CSV Optimizer selected
+          <Fade in>
+            <Box sx={{ width: "100%", maxWidth: "900px", mx: "auto", mt: 4 }}>
+              <IconButton
+                color="secondary"
+                onClick={() => setSelectedProblem(null)}
+                size="large"
+                sx={{ mb: 1 }}
+              >
+                <ArrowBackIcon />
+              </IconButton>
+              <CsvOptimizer />
+            </Box>
+          </Fade>
         ) : (
+          // All other problems: existing logic
           <Fade in>
             <Box sx={{ width: "100%", maxWidth: "1050px", mx: "auto", mt: 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
@@ -654,23 +714,23 @@ function App() {
                     )}
                     {/* Plot */}
                     {plotUrl && (
-  <Box sx={{ mt: 2, display: "flex", flexDirection: "column", alignItems: "center" }}>
-    <img
-      src={plotUrl}
-      alt="Fitness Progress"
-      style={{ maxWidth: "100%", borderRadius: 8 }}
-    />
-    <Button
-      variant="outlined"
-      color="secondary"
-      startIcon={<DownloadIcon />}
-      onClick={handleDownloadPlot}
-      sx={{ mt: 2, mb: 1, alignSelf: "flex-start" }}
-    >
-      Download Plot (PNG)
-    </Button>
-  </Box>
-)}
+                      <Box sx={{ mt: 2, display: "flex", flexDirection: "column", alignItems: "center" }}>
+                        <img
+                          src={plotUrl}
+                          alt="Fitness Progress"
+                          style={{ maxWidth: "100%", borderRadius: 8 }}
+                        />
+                        <Button
+                          variant="outlined"
+                          color="secondary"
+                          startIcon={<DownloadIcon />}
+                          onClick={handleDownloadPlot}
+                          sx={{ mt: 2, mb: 1, alignSelf: "center" }}
+                        >
+                          Download Plot (PNG)
+                        </Button>
+                      </Box>
+                    )}
                     {/* Download Solution */}
                     <Button
                       variant="contained"

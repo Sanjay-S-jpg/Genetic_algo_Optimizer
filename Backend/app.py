@@ -19,7 +19,8 @@ PROBLEM_LIST = [
     {"id": "rastrigin", "name": "Rastrigin Function"},
     {"id": "royal_road", "name": "Royal Road Function"},
     {"id": "sphere", "name": "Sphere Function"},
-    {"id": "multiobjective_schaffer", "name": "Multi-Objective Schaffer Function"}
+    {"id": "multiobjective_schaffer", "name": "Multi-Objective Schaffer Function"},
+    {"id": "csv_optimizer", "name": "CSV Optimizer"},
 ]
 
 @app.route('/')
@@ -54,6 +55,29 @@ def get_problems():
         if fname.endswith(".py"):
             all_probs.append({"id": f"custom:{fname[:-3]}", "name": f"Custom: {fname[:-3]}"})
     return jsonify(all_probs)
+
+@app.route('/api/upload_csv', methods=['POST'])
+def upload_csv():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    if not file.filename.endswith('.csv'):
+        return jsonify({'error': 'Only .csv files allowed'}), 400
+    safe_filename = file.filename.replace("/", "_").replace("\\", "_")
+    save_path = os.path.join("uploaded_csvs", safe_filename)
+    if not os.path.exists("uploaded_csvs"):
+        os.makedirs("uploaded_csvs")
+    file.save(save_path)
+    # Optionally, read headers for preview
+    import pandas as pd
+    df = pd.read_csv(save_path, nrows=5)
+    headers = list(df.columns)
+    preview_data = df.to_dict(orient="records")
+    return jsonify({'message': 'File uploaded', 'filename': safe_filename, 'headers': headers, 'preview': preview_data})
+
+
 
 @app.route('/api/problem_params/<problem_id>', methods=['GET'])
 def get_problem_params(problem_id):
